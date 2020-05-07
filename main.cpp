@@ -1,3 +1,4 @@
+/*------------------------------------Include-------------------------------------------*/
 #include "DA7212.h"
 DA7212 audio;
 #include "mbed.h"
@@ -14,6 +15,8 @@ DA7212 audio;
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
 
+/*-----------------------------------Define---------------------------------------------*/
+
 #define DO 261
 #define RE 294
 #define MI 330
@@ -28,6 +31,8 @@ DA7212 audio;
 #define Mi 659
 #define X  0
 
+/*----------------------------------Global Declare---------------------------------------*/
+
 int16_t waveform[kAudioTxBufferSize];
 volatile int current_song = 0;
 volatile int mode = 0;
@@ -37,87 +42,76 @@ uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn btn_mode(SW2);
 InterruptIn btn_cont(SW3);
 
-int song_star[42] = {
-  DO, DO, SO, SO, LA, LA, SO, 
-  FA, FA, MI, MI, RE, RE, DO, 
-  SO, SO, FA, FA, MI, MI, RE, 
-  SO, SO, FA, FA, MI, MI, RE, 
-  DO, DO, SO, SO, LA, LA, SO, 
+/*---------------------------------Interrupt Function------------------------------------*/
+
+void change_mode()
+{
+   mode = !mode;
+}
+
+void change_control()
+{
+   if(current_cont==2)
+   {
+      current_cont = 0;
+   }
+   else
+   {
+      current_cont = current_cont+1;
+   }
+   
+}
+
+/*-------------------------------------Song Array---------------------------------------*/
+
+volatile int song_star[47] = {
+  DO, DO, SO, SO, LA, LA, SO, SO, 
+  FA, FA, MI, MI, RE, RE, DO, DO,
+  SO, SO, FA, FA, MI, MI, RE, RE,
+  SO, SO, FA, FA, MI, MI, RE, RE,
+  DO, DO, SO, SO, LA, LA, SO, SO,
   FA, FA, MI, MI, RE, RE, DO};
+/*
+volatile int noteLength_star[42] = {
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2};*/
 
-int noteLength_star[48] = {
-  1, 1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 1, 2};
-
-int song_yamaha[47] = {
-  DO, RE, MI, FA, SO, LA, FA, MI, RE, DO, DO,
-  DO, RE, MI, FA, SO, LA, FA, MI, RE, DO, DO,
-  SO, FA, MI, SO, FA, MI, RE,
-  SO, FA, MI, SO, FA, MI, RE,
-  DO, RE, MI, FA, SO, LA, FA, MI, RE, DO, DO};
-
-int noteLength_yamaha[47] ={
+volatile int song_yamaha[47] = {
+  DO, RE, MI, FA, SO, SO, 
+  LA, FA, MI, MI, RE, RE, DO, DO, DO, DO,
+  SO, FA, MI, SO, FA, MI, RE, RE,
+  SO, FA, MI, SO, FA, MI, RE, RE,
+  DO, RE, MI, FA, SO, SO,
+  LA, FA, MI, MI, RE, RE, DO, DO,DO};
+/*
+volatile int noteLength_yamaha[47] ={
    1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2,
    1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2,
    1, 1, 1, 1, 1, 1, 2,
    1, 1, 1, 1, 1, 1, 2,
-   1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1};
+   1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1};*/
 
-int song_bee[52] = {
-  SO, MI, MI, FA, RE, RE,
-  DO, RE, MI, FA, SO, SO, SO,
-  SO, MI, MI, FA, RE, RE,
-  DO, MI, SO, SO, MI, MI, MI,
-  RE, RE, RE, RE, RE, MI, FA,
-  MI, MI, MI, MI, MI, FA, SO,
-  SO, MI, MI, FA, RE, RE,
-  DO, MI, SO, SO, DO, DO};
-
-int noteLength_bee[52] ={
-   1, 1, 2, 1, 1, 2,
-   1, 1, 1, 1, 1, 1, 2,
-   1, 1, 2, 1, 1, 2,
-   1, 1, 1, 1, 1, 1, 2,
-   1, 1, 1, 1, 1, 1, 2,
-   1, 1, 1, 1, 1, 1, 2,
-   1, 1, 2, 1, 1, 2,
-   1, 1, 1, 1, 2, 1};
-
-int song_alice[41] ={
-   Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA,
-   DO, MI, LA, SI, SI,
-   MI, LAb, SI, Do, Do,
-   MI, Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA,
-   DO, MI, LA, SI, SI,
-   MI, Do, SI, LA, LA};
-
-int noteLength_alice[41] ={
+volatile int song_alice[47] ={
+   Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA, LA,
+   DO, MI, LA, SI, SI, SI,
+   MI, LAb, SI, Do, Do, Do,
+   MI, Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA, LA,
+   DO, MI, LA, SI, SI, SI,
+   MI, Do, SI, LA, LA, LA};
+/*
+volatile int noteLength_alice[41] ={
     1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
     1, 1, 1, 2, 1,
     1, 1, 1, 2, 1,
     1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
     1, 1, 1, 2, 1,
-    1, 1, 1, 2, 1};
+    1, 1, 1, 2, 1}; */
 
-int song_tiger[36] ={
-    DO, RE, MI, DO, DO, RE, MI, DO,
-    MI, FA, SO, SO, MI, FA, SO, SO,
-    SO, LA, SO, FA, MI, DO,
-    SO, LA, SO, FA, MI, DO,
-    DO, RE, DO, DO,
-    DO, RE, DO, DO};
-
-int noteLength_tiger[36] ={
-    2, 2, 2, 2, 2, 2, 2, 2,
-    2, 2, 2, 2, 2, 2, 2, 2,
-    1, 1, 1, 1, 2, 2,
-    1, 1, 1, 1, 2, 2,
-    2, 2, 2, 2, 
-    2, 2, 2, 2};    
+/*------------------------------------Audio Function------------------------------------*/
 
 void playNote(int freq)
 {
@@ -135,17 +129,13 @@ void playSong()
   if(current_song==0)
   {
     //uLCD.printf("\nSong: Twinkle Star\n");
-    for(i = 0; i < 42; i++)
+    for(i = 0; i < 47; i++)
     {
-        int length = noteLength_star[i];
-        while(length--)
-        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_star[i]);
           }
-          if(length <= 1) wait(0.25);
-        }
+          wait(0.2);
     }
   }
   else if(current_song==1)
@@ -153,88 +143,29 @@ void playSong()
     //uLCD.printf("\nSong: YAMAHA\n");
     for(i = 0; i < 47; i++)
     {
-        int length = noteLength_yamaha[i];
-        while(length--)
-        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_yamaha[i]);
           }
-          if(length <= 1) wait(0.25);
-        }
+          wait(0.2);
     }
   }
-  else if(current_song==2)
+  else
   { 
-    //uLCD.printf("\nSong: Buzy Bee\n");
-    for(i = 0; i < 52; i++)
+    //uLCD.printf("\nSong: Alice\n");
+    for(i = 0; i < 47; i++)
     {
-        int length = noteLength_bee[i];
-        while(length--)
-        {
-          for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
-          {
-            playNote(song_bee[i]);
-          }
-          if(length <= 1) wait(0.25);
-        }
-    }
-  }
-  else if(current_song==3)
-  {
-    for(i = 0; i < 41; i++)
-    {
-        int length = noteLength_alice[i];
-        while(length--)
-        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_alice[i]);
           }
-          if(length <= 1) wait(0.25);
-        }
+          wait(0.2);
     }
-  }
-  else
-  {
-    for(i = 0; i < 36; i++)
-    {
-        int length = noteLength_tiger[i];
-        while(length--)
-        {
-          for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
-          {
-            playNote(song_tiger[i]);
-          }
-          if(length <= 1) wait(0.15);
-        }
-    }
-  }
-  
+  } 
 }
 
+/*----------------------------------DNN Predict Function-------------------------------*/
 
-void change_mode()
-{
-   mode = !mode;
-}
-
-void change_control()
-{
-   if(current_cont==4)
-   {
-      current_cont = 0;
-   }
-   else
-   {
-      current_cont = current_cont+1;
-   }
-   
-}
-
-
-
-// Return the result of the last prediction
 int PredictGesture(float* output) {
   // How many times the most recent gesture has been matched in a row
   static int continuous_count = 0;
@@ -274,7 +205,7 @@ int PredictGesture(float* output) {
   return this_predict;
 }
 
-/*-------------------------------main-----------------------------------------*/
+/*-------------------------------DNN main Function--------------------------------------*/
 
 int main(int argc, char* argv[]) {
   btn_mode.rise(&change_mode);
@@ -400,7 +331,7 @@ int main(int argc, char* argv[]) {
       if(config.output_message[gesture_index]=="1")
       {
         select_mode = 0;
-         if(current_song==0) current_song=4;
+         if(current_song==0) current_song=2;
          else current_song = current_song-1;
          error_reporter->Report("%d\n",current_song);
          uLCD.cls();
@@ -409,7 +340,7 @@ int main(int argc, char* argv[]) {
       else if(config.output_message[gesture_index]=="2")
       {
         select_mode = 0;
-         if(current_song==4) current_song=0;
+         if(current_song==2) current_song=0;
          else current_song = current_song+1;
          error_reporter->Report("%d\n",current_song);
          uLCD.cls();
@@ -425,5 +356,4 @@ int main(int argc, char* argv[]) {
     }
   }
   }
-  //}
 }
