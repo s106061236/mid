@@ -1,6 +1,5 @@
 /*------------------------------------Include-------------------------------------------*/
 #include "DA7212.h"
-DA7212 audio;
 #include "mbed.h"
 #include <cmath>
 #include "uLCD_4DGL.h"
@@ -15,7 +14,7 @@ DA7212 audio;
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow/lite/version.h"
 
-/*-----------------------------------Define---------------------------------------------*/
+/*-----------------------------------Define --------------------------------------------*/
 
 #define DO 261
 #define RE 294
@@ -33,23 +32,27 @@ DA7212 audio;
 
 /*----------------------------------Global Declare---------------------------------------*/
 
+DA7212 audio;
 int16_t waveform[kAudioTxBufferSize];
-volatile int current_song = 0;
-volatile int mode = 0;
-volatile int current_cont = 0;
-volatile int select_mode = 0;
+volatile int current_song = 0;  // which will be played when trigger the btn
+volatile int mode = 0;          // pulse & play control
+volatile int current_cont = 0;  // current song for selecting mode
+volatile int select_mode = 0;   // the selecting mode control
+volatile int enable = 0;        // when a function is being executed, others can't be executed at the same time
 uLCD_4DGL uLCD(D1, D0, D2);
-InterruptIn btn_mode(SW2);
-InterruptIn btn_cont(SW3);
+InterruptIn btn_mode(SW2);      // interrupt input for pulse & play function
+InterruptIn btn_cont(SW3);      // interrupt input fot select song function
+Thread thread_DNN(osPriorityNormal,120*1024); // the main thread with larger stack space
+Thread t(osPriorityNormal);     // the thread for executing taiko function 
 
 /*---------------------------------Interrupt Function------------------------------------*/
 
-void change_mode()
+void change_mode() // interrupt function
 {
-   mode = !mode;
+   mode = !mode; // mode==1 for pulse&play 
 }
 
-void change_control()
+void change_control() // to control the select mode parameter
 {
    if(current_cont==2)
    {
@@ -64,52 +67,56 @@ void change_control()
 
 /*-------------------------------------Song Array---------------------------------------*/
 
-volatile int song_star[47] = {
-  DO, DO, SO, SO, LA, LA, SO, SO, 
-  FA, FA, MI, MI, RE, RE, DO, DO,
-  SO, SO, FA, FA, MI, MI, RE, RE,
-  SO, SO, FA, FA, MI, MI, RE, RE,
-  DO, DO, SO, SO, LA, LA, SO, SO,
+volatile int song_star[42] = { // Twinkle Twinkle Little Star
+  DO, DO, SO, SO, LA, LA, SO, 
+  FA, FA, MI, MI, RE, RE, DO,
+  SO, SO, FA, FA, MI, MI, RE,
+  SO, SO, FA, FA, MI, MI, RE,
+  DO, DO, SO, SO, LA, LA, SO,
   FA, FA, MI, MI, RE, RE, DO};
-/*
-volatile int noteLength_star[42] = {
-  1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 2,
-  1, 1, 1, 1, 1, 1, 2};*/
 
-volatile int song_yamaha[47] = {
-  DO, RE, MI, FA, SO, SO, 
-  LA, FA, MI, MI, RE, RE, DO, DO, DO, DO,
-  SO, FA, MI, SO, FA, MI, RE, RE,
-  SO, FA, MI, SO, FA, MI, RE, RE,
-  DO, RE, MI, FA, SO, SO,
-  LA, FA, MI, MI, RE, RE, DO, DO,DO};
-/*
-volatile int noteLength_yamaha[47] ={
-   1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2,
-   1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 2,
+volatile int noteLength_star[42] = { 
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2,
+  1, 1, 1, 1, 1, 1, 2};
+
+volatile int song_yamaha[44] = { // The Song of Yamaha Advertisement
+  DO, RE, MI, FA, SO, 
+  LA, FA, MI, RE, DO,
+  DO, RE, MI, FA, SO, 
+  LA, FA, MI, RE, DO,
+  SO, FA, MI, SO, FA, MI, RE,
+  SO, FA, MI, SO, FA, MI, RE,
+  DO, RE, MI, FA, SO,
+  LA, FA, MI, RE, DO};
+
+volatile int noteLength_yamaha[44] ={
+   1, 1, 1, 1, 2,
+   1, 1, 2, 2, 4,
+   1, 1, 1, 1, 2,
+   1, 1, 2, 2, 4,
    1, 1, 1, 1, 1, 1, 2,
    1, 1, 1, 1, 1, 1, 2,
-   1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1};*/
+   1, 1, 1, 1, 2, 1, 1, 2, 2, 3};
 
-volatile int song_alice[47] ={
-   Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA, LA,
-   DO, MI, LA, SI, SI, SI,
-   MI, LAb, SI, Do, Do, Do,
-   MI, Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA, LA, LA,
-   DO, MI, LA, SI, SI, SI,
-   MI, Do, SI, LA, LA, LA};
-/*
-volatile int noteLength_alice[41] ={
-    1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
-    1, 1, 1, 2, 1,
-    1, 1, 1, 2, 1,
-    1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1,
-    1, 1, 1, 2, 1,
-    1, 1, 1, 2, 1}; */
+volatile int song_alice[35] ={ // Fur Elise - Beethoven
+   Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA,
+   DO, MI, LA, SI,
+   MI, LAb, SI, Do,
+   MI, Mi, Mib, Mi, Mib, Mi, SI, Re, Do, LA,
+   DO, MI, LA, SI,
+   MI, Do, SI, LA};
+
+volatile int noteLength_alice[35] ={
+    1, 1, 1, 1, 1, 1, 1, 1, 3,
+    1, 1, 1, 3,
+    1, 1, 1, 3,
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 3,
+    1, 1, 1, 3,
+    1, 1, 1, 3};
 
 /*------------------------------------Audio Function------------------------------------*/
 
@@ -124,44 +131,136 @@ void playNote(int freq)
 }
 
 void playSong()
-{
-  int i,j;
-  if(current_song==0)
+{ 
+  int i,j,length;
+  if(current_song==0) // current_sont control which song should be play
   {
-    //uLCD.printf("\nSong: Twinkle Star\n");
-    for(i = 0; i < 47; i++)
+    for(i = 0; i < 42; i++)
     {
+        length = noteLength_star[i];
+        while(length--)
+        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_star[i]);
           }
-          wait(0.2);
+          if(length<1) wait(0.1);
+        }
+        if(mode==1) // if triggered btn at this moment, mode=1, then break out the function ==> Achieve Pulse Function
+        {
+          mode=0;
+          break;
+        }
     }
   }
   else if(current_song==1)
   {
-    //uLCD.printf("\nSong: YAMAHA\n");
-    for(i = 0; i < 47; i++)
-    {
+    for(i = 0; i < 44; i++)
+    {   
+        length = noteLength_yamaha[i];
+        while(length--)
+        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_yamaha[i]);
           }
-          wait(0.2);
+          if(length<1) wait(0.1);
+        }
+        if(mode==1)
+        {
+          mode=0;
+          break;
+        }
     }
   }
   else
   { 
     //uLCD.printf("\nSong: Alice\n");
-    for(i = 0; i < 47; i++)
+    for(i = 0; i < 35; i++)
     {
+        length = noteLength_alice[i];
+        while(length--)
+        {
           for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
           {
             playNote(song_alice[i]);
           }
-          wait(0.2);
+          if(length<1) wait(0.1);
+        }
+        if(mode==1)
+        {
+          mode=0;
+          break;
+        }
     }
   } 
+  playNote(0); // Note that we should add this line, or the Player will play the last note of the song continuously
+
+}
+
+/*-------------------------------------Taiko Function----------------------------------*/
+
+void taiko(){
+  enable=1; // lock
+  uLCD.cls();
+  int i,j,k,length;
+  for(k=5; k>0;k--)
+  {
+    uLCD.locate(0,0);
+    uLCD.printf("The game will start\nafter %d seconds\n",k);
+    wait(1);
+  }
+  k=0;
+  uLCD.cls();
+
+  for(i = 0; i < 44; i++)
+    {
+        uLCD.cls();
+        uLCD.locate(9,9);
+        if((i==2)||(i==12)||(i==24)||(i==31)||(i==36))
+        {
+          uLCD.printf("Tilt!~~");
+        }
+        else if((i==3)||(i==8)||(i==13)||(i==18)||(i==25)||(i==32)||(i==37)||(i==42))
+        {
+          uLCD.printf("Ready~~~");
+        }
+        else if((i==4)||(i==14)||(i==26)||(i==33)||(i==38)) // the predefine beat for tilt
+        {
+          if(tilt==1){
+            uLCD.printf("Hit!");
+            k=k+100;
+          }
+          else uLCD.printf("Miss~");
+        }
+        else if((i==7)||(i==17)||(i==41))
+        {
+          uLCD.printf("Raise!~~");
+        }
+        else if((i==9)||(i==19)||(i==43)) // the predefine beat for raise
+        {
+          if(raise==1){
+            uLCD.printf("Hit!");
+            k=k+100;
+          }
+          else uLCD.printf("Miss~");
+        }
+
+        length = noteLength_yamaha[i];
+        while(length--)
+        {
+          for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
+          {
+            playNote(song_yamaha[i]);
+          }
+          if(length<1) wait(0.05);
+        }
+    }
+
+    playNote(0);
+    uLCD.cls();
+    uLCD.printf("Score = %d / 800\n",k);
+    enable=0; // unlock
 }
 
 /*----------------------------------DNN Predict Function-------------------------------*/
@@ -207,11 +306,8 @@ int PredictGesture(float* output) {
 
 /*-------------------------------DNN main Function--------------------------------------*/
 
-int main(int argc, char* argv[]) {
-  btn_mode.rise(&change_mode);
-  btn_cont.rise(&change_control);
-  uLCD.printf("Michael Chu 106061236\n");
-  while(true){  
+void DNN() {
+  uLCD.printf("Michael 106061236\n");  
   // Create an area of memory to use for input, output, and intermediate arrays.
   // The size of this will depend on the model you're using, and may need to be
   // determined by experimentation.
@@ -286,21 +382,28 @@ int main(int argc, char* argv[]) {
   }
 
   error_reporter->Report("Set up successful...\n");
-  error_reporter->Report("%d\n",current_song);
+  
+/*----------------------------Loop for Selecting & Playing-------------------------*/
+
   while (true) {
-    
-    if(mode==1)
+    if((mode==1)&&(current_song!=3))
     {
       mode=0;
-       playSong();
+      playSong(); // play song for song_1 ~ song_3
+    }
+    else if((mode==1)&&(current_song==3))
+    {
+      mode=0;
+      t.start(taiko); // song_4 for taiko game
     }
     else
     {
-      if(select_mode ==1 )
+      if(select_mode == 1) // select mode
       {
         current_song = current_cont;
         uLCD.locate(13,0);
         uLCD.printf("%d",current_song+1);
+        uLCD.printf("%d",tilt);
         
       }
     // Attempt to read new data from the accelerometer
@@ -327,33 +430,37 @@ int main(int argc, char* argv[]) {
     should_clear_buffer = gesture_index < label_num;
 
     // Produce an output
-    if (gesture_index < label_num) {
-      if(config.output_message[gesture_index]=="1")
+    if ((gesture_index < label_num)&&(enable==0)) {
+      if(config.output_message[gesture_index]=="1") // backward mode
       {
-        select_mode = 0;
-         if(current_song==0) current_song=2;
+         select_mode = 0;
+         if(current_song==0) current_song=3;
          else current_song = current_song-1;
-         error_reporter->Report("%d\n",current_song);
          uLCD.cls();
          uLCD.printf("Now Song is: %d\n",current_song+1);
       }
-      else if(config.output_message[gesture_index]=="2")
+      else if(config.output_message[gesture_index]=="2") // forward mode
       {
-        select_mode = 0;
-         if(current_song==2) current_song=0;
+         select_mode = 0;
+         if(current_song==3) current_song=0;
          else current_song = current_song+1;
-         error_reporter->Report("%d\n",current_song);
          uLCD.cls();
-         uLCD.printf("Now Song is: %d\n",current_song+1);
+         uLCD.printf("Now Song is: %d\n",current_song+1); 
       }
-      else
-      { 
+      else // select mode
+      {
          select_mode = 1;
          uLCD.cls();
          uLCD.printf("Select Mode: %d\n",current_cont+1);
-      }   
+      } 
     }
     }
   }
-  }
+}
+
+int main(){
+  btn_mode.rise(&change_mode);
+  btn_cont.rise(&change_control);
+  thread_DNN.start(DNN);
+
 }

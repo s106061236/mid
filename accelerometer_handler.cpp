@@ -27,6 +27,8 @@ I2C i2c(PTD9,PTD8);
 static int m_addr = FXOS8700CQ_SLAVE_ADDR1;
 static uint8_t data[2], res[6];
 static int16_t acc16;
+int tilt = 0;
+int raise = 0;
 
 // A buffer holding the last 200 sets of 3-channel values
 static float save_data[600] = {0.0};
@@ -87,6 +89,10 @@ bool ReadAccelerometer(tflite::ErrorReporter* error_reporter, float* input,
       acc16 -= UINT14_MAX;
     z = ((float)acc16) / 4096.0f;
 
+    if(x>0.5||y>0.5||x<-0.5||y<-0.5) tilt=1;
+    else tilt=0;
+    if(z>1.5) raise=1;
+    else raise=0;
     sample_skip_counter += 1;
   }
 

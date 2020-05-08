@@ -6,6 +6,8 @@
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/micro/micro_error_reporter.h"
 
+extern int tilt;
+extern int raise;
 extern int begin_index;
 extern TfLiteStatus SetupAccelerometer(tflite::ErrorReporter* error_reporter);
 extern bool ReadAccelerometer(tflite::ErrorReporter* error_reporter,
