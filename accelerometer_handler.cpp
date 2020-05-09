@@ -89,9 +89,9 @@ bool ReadAccelerometer(tflite::ErrorReporter* error_reporter, float* input,
       acc16 -= UINT14_MAX;
     z = ((float)acc16) / 4096.0f;
 
-    if(x>0.5||y>0.5||x<-0.5||y<-0.5) tilt=1;
+    if(x>0.55||y>0.55||x<-0.55||y<-0.55) tilt=1;
     else tilt=0;
-    if(z>1.5) raise=1;
+    if(z>1.2) raise=1;
     else raise=0;
     sample_skip_counter += 1;
   }

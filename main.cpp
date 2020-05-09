@@ -40,7 +40,7 @@ Serial pc(USBTX, USBRX);
 int16_t waveform[kAudioTxBufferSize];
 volatile int current_song = 0;  // which will be played when trigger the btn
 volatile int mode = 0;          // pulse & play control
-volatile int current_cont = 0;  // current song for selecting mode
+volatile int current_cont = 0;  // for selecting mode
 volatile int select_mode = 0;   // the selecting mode control
 volatile int enable = 0;        // when a function is being executed, others can't be executed at the same time
 uLCD_4DGL uLCD(D1, D0, D2);
@@ -48,7 +48,9 @@ InterruptIn btn_mode(SW2);      // interrupt input for pulse & play function
 InterruptIn btn_cont(SW3);      // interrupt input fot select song function
 Thread thread_DNN(osPriorityNormal,120*1024); // the main thread with larger stack space
 Thread t(osPriorityNormal);     // the thread for executing taiko function 
-
+char serialInBuffer1[bufferLength];
+char serialInBuffer2[bufferLength];
+int serialCount = 0;
 /*---------------------------------Interrupt Function------------------------------------*/
 
 void change_mode() // interrupt function
@@ -56,17 +58,9 @@ void change_mode() // interrupt function
    mode = !mode; // mode==1 for pulse&play 
 }
 
-void change_control() // to control the select mode parameter
+void change_control() // to lock the select moode
 {
-   if(current_cont==2)
-   {
-      current_cont = 0;
-   }
-   else
-   {
-      current_cont = current_cont+1;
-   }
-   
+   current_cont = !current_cont;   
 }
 
 /*-------------------------------------Song Array---------------------------------------*/
@@ -232,12 +226,20 @@ void playSong()
 void load(){ // load the data of the song sent by python and then play it
   uLCD.printf("Loading...\n");
   int i=0;
+  serialCount = 0;
   while(i < signalLength)
   {
     if(pc.readable())
     {
-      noteLength_load[i] = pc.getc();
-      i++;
+      serialInBuffer1[serialCount] = pc.getc();
+      serialCount++;
+      if(serialCount==3)
+      {
+        serialInBuffer1[serialCount] = '\0';
+        song_load[i] = (int) atoi(serialInBuffer1);
+        serialCount = 0;
+        i++;
+      }
     }
     if(mode==1)
     {
@@ -246,13 +248,21 @@ void load(){ // load the data of the song sent by python and then play it
     }
   }
   i=0;
+  serialCount = 0;
   uLCD.printf("----------\n");
   while(i < signalLength)
   {
     if(pc.readable())
     {
-      noteLength_load[i] = pc.getc();
-      i++;
+      serialInBuffer2[serialCount] = pc.getc();
+      serialCount++;
+      if(serialCount==1)
+      {
+        serialInBuffer2[serialCount] = '\0';
+        noteLength_load[i] = (int) atoi(serialInBuffer2);
+        serialCount = 0;
+        i++;
+      }
     }
     if(mode==1)
     {
@@ -479,15 +489,6 @@ void DNN() {
       mode=0;
       t.start(taiko); // song_4 for taiko game
     }
-    else
-    {
-      if(select_mode == 1) // select mode
-      {
-        current_song = current_cont;
-        uLCD.locate(13,0);
-        uLCD.printf("%d",current_song+1);
-        
-      }
     // Attempt to read new data from the accelerometer
     got_data = ReadAccelerometer(error_reporter, model_input->data.f,
                                  input_length, should_clear_buffer);
@@ -515,7 +516,6 @@ void DNN() {
     if ((gesture_index < label_num)&&(enable==0)) {
       if(config.output_message[gesture_index]=="1") // backward mode
       {
-         select_mode = 0;
          if(current_song==0) current_song=4;
          else current_song = current_song-1;
          uLCD.cls();
@@ -525,7 +525,6 @@ void DNN() {
       }
       else if(config.output_message[gesture_index]=="2") // forward mode
       {
-         select_mode = 0;
          if(current_song==4) current_song=0;
          else current_song = current_song+1;
          uLCD.cls();
@@ -533,22 +532,84 @@ void DNN() {
          uLCD.locate(0,1);
          uLCD.printf("Mode   \n");
       }
-      else // select mode
+      else if(config.output_message[gesture_index]=="3")// select mode
       {
-         select_mode = 1;
-         uLCD.cls();
-         uLCD.printf("Select Mode: %d\n",current_cont+1);
-         uLCD.locate(0,1);
-         uLCD.printf("Select \n");
-      } 
+        if(current_cont==0)
+        {
+          uLCD.cls();
+          uLCD.printf("Press to lock");
+        }
+        else
+        {
+          uLCD.cls();
+          uLCD.printf("Locked!");
+        }
+         while(current_cont==1)
+         {
+            if(mode==1)
+            {
+              mode = 0;
+              playSong();
+            }
+            // Attempt to read new data from the accelerometer
+            got_data = ReadAccelerometer(error_reporter, model_input->data.f,
+                                 input_length, should_clear_buffer);
+
+            // If there was no new data,
+            // don't try to clear the buffer again and wait until next time
+            if (!got_data) {
+            should_clear_buffer = false;
+            continue;
+                            }
+
+            // Run inference, and report any error
+            TfLiteStatus invoke_status = interpreter->Invoke();
+            if (invoke_status != kTfLiteOk) {
+            error_reporter->Report("Invoke failed on index: %d\n", begin_index);
+            continue;
+                                            }
+
+            // Analyze the results to obtain a prediction
+            gesture_index = PredictGesture(interpreter->output(0)->data.f);
+            // Clear the buffer next time we read data
+            should_clear_buffer = gesture_index < label_num;
+
+            // Produce an output
+            if ((gesture_index < label_num)&&(enable==0)) {
+            if(config.output_message[gesture_index]=="1") // backward mode
+            {
+              current_song = 0;
+              uLCD.cls();
+              uLCD.printf("Select Song is: %d\n",current_song+1);
+              uLCD.locate(0,1);
+              uLCD.printf("Select \n");
+            }
+            else if(config.output_message[gesture_index]=="2") // forward mode
+            {
+              current_song = 1;
+              uLCD.cls();
+              uLCD.printf("Select Song is: %d\n",current_song+1); 
+              uLCD.locate(0,1);
+              uLCD.printf("Select \n");
+            }
+            else if(config.output_message[gesture_index]=="3")// select mode
+            {
+              current_song = 2;
+              uLCD.cls();
+              uLCD.printf("Select Song is: %d\n",current_song+1); 
+              uLCD.locate(0,1);
+               uLCD.printf("Select \n");
+            }
+            } 
+          }   
+      }
     }
-    }
-  }
+  }    
 }
+
 
 int main(){
   btn_mode.rise(&change_mode);
   btn_cont.rise(&change_control);
   thread_DNN.start(DNN);
-
 }
