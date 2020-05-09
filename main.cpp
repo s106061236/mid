@@ -40,8 +40,7 @@ Serial pc(USBTX, USBRX);
 int16_t waveform[kAudioTxBufferSize];
 volatile int current_song = 0;  // which will be played when trigger the btn
 volatile int mode = 0;          // pulse & play control
-volatile int current_cont = 0;  // for selecting mode
-volatile int select_mode = 0;   // the selecting mode control
+volatile int current_cont = 0;  // lock for select mode
 volatile int enable = 0;        // when a function is being executed, others can't be executed at the same time
 uLCD_4DGL uLCD(D1, D0, D2);
 InterruptIn btn_mode(SW2);      // interrupt input for pulse & play function
@@ -544,7 +543,7 @@ void DNN() {
           uLCD.cls();
           uLCD.printf("Locked!");
         }
-         while(current_cont==1)
+         while(current_cont==1) // while(locked)
          {
             if(mode==1)
             {
@@ -576,7 +575,7 @@ void DNN() {
 
             // Produce an output
             if ((gesture_index < label_num)&&(enable==0)) {
-            if(config.output_message[gesture_index]=="1") // backward mode
+            if(config.output_message[gesture_index]=="1") // gesture ring for song_1
             {
               current_song = 0;
               uLCD.cls();
@@ -584,7 +583,7 @@ void DNN() {
               uLCD.locate(0,1);
               uLCD.printf("Select \n");
             }
-            else if(config.output_message[gesture_index]=="2") // forward mode
+            else if(config.output_message[gesture_index]=="2") // gesture slope for song_2
             {
               current_song = 1;
               uLCD.cls();
@@ -592,7 +591,7 @@ void DNN() {
               uLCD.locate(0,1);
               uLCD.printf("Select \n");
             }
-            else if(config.output_message[gesture_index]=="3")// select mode
+            else if(config.output_message[gesture_index]=="3")// gesture new for song_3
             {
               current_song = 2;
               uLCD.cls();
