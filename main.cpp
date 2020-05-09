@@ -30,9 +30,13 @@
 #define Mi 659
 #define X  0
 
+#define signalLength 24
+#define bufferLength 32
+
 /*----------------------------------Global Declare---------------------------------------*/
 
 DA7212 audio;
+Serial pc(USBTX, USBRX);
 int16_t waveform[kAudioTxBufferSize];
 volatile int current_song = 0;  // which will be played when trigger the btn
 volatile int mode = 0;          // pulse & play control
@@ -66,6 +70,9 @@ void change_control() // to control the select mode parameter
 }
 
 /*-------------------------------------Song Array---------------------------------------*/
+
+volatile int song_load[signalLength]; // The song from Python
+volatile int noteLength_load[signalLength];
 
 volatile int song_star[42] = { // Twinkle Twinkle Little Star
   DO, DO, SO, SO, LA, LA, SO, 
@@ -132,6 +139,8 @@ void playNote(int freq)
 
 void playSong()
 { 
+  uLCD.locate(0,1);
+  uLCD.printf("Playing\n");
   int i,j,length;
   if(current_song==0) // current_sont control which song should be play
   {
@@ -173,7 +182,7 @@ void playSong()
         }
     }
   }
-  else
+  else if(current_song==2)
   { 
     //uLCD.printf("\nSong: Alice\n");
     for(i = 0; i < 35; i++)
@@ -193,9 +202,67 @@ void playSong()
           break;
         }
     }
+  }
+  else
+  {
+    //uLCD.printf("\nSong: Python Load\n");
+    for(i=0; i < signalLength; i++)
+    {
+      length = noteLength_load[i];
+      while(length--)
+      {
+        for(j = 0; j < kAudioSampleFrequency / kAudioTxBufferSize; ++j)
+        {
+          playNote(song_load[i]);
+        }
+        if(length<1) wait(0.1);
+      }
+      if(mode==1)
+      {
+        mode=0;
+        break;
+      }
+    }
   } 
   playNote(0); // Note that we should add this line, or the Player will play the last note of the song continuously
+  uLCD.locate(0,1);
+  uLCD.printf("Mode   \n");
+}
 
+void load(){ // load the data of the song sent by python and then play it
+  uLCD.printf("Loading...\n");
+  int i=0;
+  while(i < signalLength)
+  {
+    if(pc.readable())
+    {
+      noteLength_load[i] = pc.getc();
+      i++;
+    }
+    if(mode==1)
+    {
+      uLCD.printf("Failed\n");
+      break;
+    }
+  }
+  i=0;
+  uLCD.printf("----------\n");
+  while(i < signalLength)
+  {
+    if(pc.readable())
+    {
+      noteLength_load[i] = pc.getc();
+      i++;
+    }
+    if(mode==1)
+    {
+      mode=0;
+      uLCD.printf("Not");
+      break;
+    }
+  }
+  uLCD.printf("Finished!\n");
+  playSong();
 }
 
 /*-------------------------------------Taiko Function----------------------------------*/
@@ -206,8 +273,8 @@ void taiko(){
   int i,j,k,length;
   for(k=5; k>0;k--)
   {
-    uLCD.locate(0,0);
-    uLCD.printf("The game will start\nafter %d seconds\n",k);
+    uLCD.locate(0,3);
+    uLCD.printf("Game will start\nafter %d seconds\n",k);
     wait(1);
   }
   k=0;
@@ -259,7 +326,12 @@ void taiko(){
 
     playNote(0);
     uLCD.cls();
+    uLCD.locate(0,9);
     uLCD.printf("Score = %d / 800\n",k);
+    uLCD.locate(0,0);
+    uLCD.printf("Now Song is %d\n",current_song+1);
+    uLCD.locate(0,1);
+    uLCD.printf("Mode   \n");
     enable=0; // unlock
 }
 
@@ -307,7 +379,12 @@ int PredictGesture(float* output) {
 /*-------------------------------DNN main Function--------------------------------------*/
 
 void DNN() {
-  uLCD.printf("Michael 106061236\n");  
+  uLCD.printf("Michael 106061236\n");
+  wait(1);
+  uLCD.cls();
+  uLCD.printf("Now Song is %d",current_song+1);
+  uLCD.locate(0,1);
+  uLCD.printf("Mode   \n");  
   // Create an area of memory to use for input, output, and intermediate arrays.
   // The size of this will depend on the model you're using, and may need to be
   // determined by experimentation.
@@ -386,7 +463,13 @@ void DNN() {
 /*----------------------------Loop for Selecting & Playing-------------------------*/
 
   while (true) {
-    if((mode==1)&&(current_song!=3))
+    if((mode==1)&&(current_song==4))
+    {
+      mode=0;
+      load();
+     // play song for song_4(load from python)
+    }
+    else if((mode==1)&&(current_song!=3))
     {
       mode=0;
       playSong(); // play song for song_1 ~ song_3
@@ -403,7 +486,6 @@ void DNN() {
         current_song = current_cont;
         uLCD.locate(13,0);
         uLCD.printf("%d",current_song+1);
-        uLCD.printf("%d",tilt);
         
       }
     // Attempt to read new data from the accelerometer
@@ -434,24 +516,30 @@ void DNN() {
       if(config.output_message[gesture_index]=="1") // backward mode
       {
          select_mode = 0;
-         if(current_song==0) current_song=3;
+         if(current_song==0) current_song=4;
          else current_song = current_song-1;
          uLCD.cls();
          uLCD.printf("Now Song is: %d\n",current_song+1);
+         uLCD.locate(0,1);
+         uLCD.printf("Mode   \n");
       }
       else if(config.output_message[gesture_index]=="2") // forward mode
       {
          select_mode = 0;
-         if(current_song==3) current_song=0;
+         if(current_song==4) current_song=0;
          else current_song = current_song+1;
          uLCD.cls();
          uLCD.printf("Now Song is: %d\n",current_song+1); 
+         uLCD.locate(0,1);
+         uLCD.printf("Mode   \n");
       }
       else // select mode
       {
          select_mode = 1;
          uLCD.cls();
          uLCD.printf("Select Mode: %d\n",current_cont+1);
+         uLCD.locate(0,1);
+         uLCD.printf("Select \n");
       } 
     }
     }

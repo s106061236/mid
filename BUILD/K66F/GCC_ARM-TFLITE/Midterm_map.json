@@ -13,23 +13,23 @@
     {
         "module": "BUILD/K66F",
         "size": {
-            ".text": 45191,
+            ".text": 45824,
             ".data": 1305,
-            ".bss": 6147,
-            ".text-delta": 70,
+            ".bss": 6443,
+            ".text-delta": 117,
             ".data-delta": 0,
-            ".bss-delta": 4
+            ".bss-delta": 0
         }
     },
     {
         "module": "[fill]",
         "size": {
-            ".text": 294,
+            ".text": 301,
             ".data": 17,
             ".bss": 50,
-            ".text-delta": 6,
+            ".text-delta": 3,
             ".data-delta": 0,
-            ".bss-delta": 4
+            ".bss-delta": 0
         }
     },
     {
@@ -38,7 +38,7 @@
             ".text": 34807,
             ".data": 2472,
             ".bss": 89,
-            ".text-delta": -148,
+            ".text-delta": 0,
             ".data-delta": 0,
             ".bss-delta": 0
         }
@@ -77,17 +77,6 @@
         }
     },
     {
-        "module": "[lib]/nosys.a",
-        "size": {
-            ".text": 0,
-            ".data": 0,
-            ".bss": 0,
-            ".text-delta": -32,
-            ".data-delta": 0,
-            ".bss-delta": 0
-        }
-    },
-    {
         "module": "[lib]/stdc++.a",
         "size": {
             ".text": 40,
@@ -111,10 +100,10 @@
     },
     {
         "summary": {
-            "static_ram": 18024,
-            "static_ram_delta": 8,
-            "total_flash": 139621,
-            "total_flash_delta": -104
+            "static_ram": 18320,
+            "static_ram_delta": 0,
+            "total_flash": 140261,
+            "total_flash_delta": 120
         }
     }
 ]
